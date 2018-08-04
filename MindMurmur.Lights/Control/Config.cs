@@ -24,10 +24,10 @@ namespace MindMurmur.Lights.Control
 
         public static void Init() {
             LightStripList.Add(1);
-            LightStripList.Add(6);
-            LightStripList.Add(11);
-            LightStripList.Add(16);
-            LightStripList.Add(21);
+            //LightStripList.Add(6);
+            //LightStripList.Add(11);
+            //LightStripList.Add(16);
+            //LightStripList.Add(21);
         }
 
         public static short MaxChannels

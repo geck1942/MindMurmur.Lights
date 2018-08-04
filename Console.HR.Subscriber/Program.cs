@@ -21,8 +21,8 @@ namespace Console.HR.Subscriber
         {
             using (var bus = RabbitHutch.CreateBus("host=localhost"))
             {
-                bus.Subscribe<HRMPacket>("Console.HR.Subscriber.HRMPacket", HandlePacketMessage);
-                bus.Subscribe<HRMStatus>("Console.HR.Subscriber.HRMStatus", HandleStatusMessage);
+                //bus.Subscribe<HRMPacket>("Console.HR.Subscriber.HRMPacket", HandlePacketMessage);
+                //bus.Subscribe<HRMStatus>("Console.HR.Subscriber.HRMStatus", HandleStatusMessage);
                 bus.Subscribe<ColorControlCommand>("Commands.ColorControl", HandleColorControlCommand);
                 bus.Subscribe<HeartRateCommand>("Commands.HeartRate", HandleHeartRateCommand);
 

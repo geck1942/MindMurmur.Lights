@@ -13,7 +13,8 @@ namespace MindMurmur.Lights
         {
             //initialize config
             Config.Init();
-            StartLightManager();
+            StartLightManagerTest();
+           // StartLightManager();
             Console.WriteLine("Listening for messages. Hit <return> to quit.");
             Console.ReadLine();
         }
@@ -29,6 +30,21 @@ namespace MindMurmur.Lights
                 var manager = new LightManager(new DMX(Config.MaxChannels));
                 await manager.Start();
                 //await manager.RunTestsTask();
+                Console.WriteLine("Background work completed.");
+            }).Finally(() => Console.WriteLine("Main thread completed."));
+            Console.WriteLine("\r\n\t In Main Thread...\r\n");
+            o.Wait();   // Wait for completion of background operation.
+        }
+
+        public static void StartLightManagerTest()
+        {
+            Console.WriteLine("Shows use of Start to start on a background thread:");
+
+            var o = Observable.Start(async () =>
+            {
+                Console.WriteLine("StartLightManager...");
+                var manager = new LightManager(new DMX(Config.MaxChannels));
+                await manager.RunTestsTask();
                 Console.WriteLine("Background work completed.");
             }).Finally(() => Console.WriteLine("Main thread completed."));
             Console.WriteLine("\r\n\t In Main Thread...\r\n");

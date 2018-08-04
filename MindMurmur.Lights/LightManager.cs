@@ -133,7 +133,10 @@ namespace MindMurmur.Lights
 
         public async Task RunTestsTask()
         {
-            await LightDMX.TestSequence().ConfigureAwait(true);
+            if (LightDMX != null)
+                await LightDMX.Connect();
+
+            await LightDMX.Test().ConfigureAwait(true);
         }
 
         //async private void MainTimer_Tick(object State)

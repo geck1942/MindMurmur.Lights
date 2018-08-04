@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace MindMurmur.Lights
@@ -10,7 +11,7 @@ namespace MindMurmur.Lights
     public class DMX : IDisposable
     {
         private DMXController DMXController;
-        private short maxChannel = 64;
+        private short maxChannel = 8;
   
         public bool IsConnected = false;
 
@@ -34,10 +35,10 @@ namespace MindMurmur.Lights
                 Console.ForegroundColor = ConsoleColor.White; Console.WriteLine("[ ] Loading DMX Controller...");
                 DMXController = new DMXController();
                 DMXController.StartDevice();
-                DMXController.SetChannelCount(512);
-                await Task.Delay(3000);
-                DMXController.SetChannelCount(512);
-                await Task.Delay(3000);
+                DMXController.SetChannelCount(8);
+                await Task.Delay(2000);
+                DMXController.SetChannelCount(8);
+                await Task.Delay(2000);
                 Console.ForegroundColor = ConsoleColor.White; Console.WriteLine("[<] DMX: SetChannelCount: " + maxChannel);
                 IsConnected = true;
                 Console.ForegroundColor = ConsoleColor.Green; Console.WriteLine("[-] Connected");
@@ -74,6 +75,8 @@ namespace MindMurmur.Lights
 
         public void SendDMXFrames(byte[] channelsdata)
         {
+            Debug.WriteLine($"{"SendDMXFrames"}: {BitConverter.ToString(channelsdata)}");
+
             //// V3 k8062
             for (int i = 0; i < 2; i++)
                 for (int channel = 0; channel < channelsdata.Length; channel++)
@@ -91,6 +94,22 @@ namespace MindMurmur.Lights
             }
             Console.ForegroundColor = ConsoleColor.Green; Console.WriteLine("[-] Done testing");
         }
+        public async Task Test()
+        {
+            DMXController.SetChannelCount(8);
+            while (true)
+            {
+                Debug.Write("SetChannel");
+                for (short i = 1; i < 9; i++)
+                {
+                    DMXController.SetChannel(i, 245);
+                    Debug.Write($"({i}:{245})");
+                }
+                Debug.WriteLine("");
+                Thread.Sleep(250);
+            }
+        }
+
 
         public void SetColor(Color color)
         {
@@ -100,12 +119,22 @@ namespace MindMurmur.Lights
             SendDMXFrames(dmxdata);
         }
 
+        /// <summary>
+        /// Blinks the LED lights from whatever the current color is, marking it darker and then back to the normal color 
+        /// </summary>
+        /// <param name="currentColor"></param>
         public void HeartRateBlink(Color currentColor)
         {
-            byte[] dmxdata = GetDMXFromColors(new Color[] { Color.Black, Color.Black, Color.Black, currentColor });
+
+            byte[] dmxdataDark = GetDMXFromColors(new Color[]
+                {Color.FromArgb(0, 10, 10, 10)});
+            byte[] dmxdata = GetDMXFromColors(new Color[] { currentColor });
             Console.ForegroundColor = ConsoleColor.DarkBlue;
-            Console.WriteLine("[ BLINK ] " + currentColor.ToString() + ": (" + dmxdata[0] + "," + dmxdata[1] + "," + dmxdata[2] + ") ");
-            SendDMXFrames(dmxdata);
+            Console.WriteLine("[ BLINK ]     " + currentColor.ToString() + ": (" + dmxdataDark[0] + "," + dmxdataDark[1] + "," + dmxdataDark[2] + ") ");
+            Thread.Sleep(100);
+            SendDMXFrames(dmxdataDark);
+            Console.ForegroundColor = ConsoleColor.White;
+            Console.WriteLine("[ BLINKBACK ] " + currentColor.ToString() + ": (" + dmxdata[0] + "," + dmxdata[1] + "," + dmxdata[2] + ") ");
         }
 
         public void Dispose()
@@ -115,6 +144,10 @@ namespace MindMurmur.Lights
             VellemanDMX.StopDevice();
         }
 
+        /// <summary>
+        /// sets the maximum channels that thi will be sending DMX data to
+        /// </summary>
+        /// <param name="channelCount"></param>
         public void SetMaxChannel(short channelCount)
         {
             maxChannel = channelCount;
