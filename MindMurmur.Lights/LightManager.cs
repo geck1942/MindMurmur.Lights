@@ -23,7 +23,9 @@ namespace MindMurmur.Lights
         private Subject<Color> colorSubject = new Subject<Color>();
         HeartRateMonitor bpmMonitor;
         ColorMonitor colorMonitor;
-        private Timer heartRateBlinkTimer;
+        private Timer heartRatePulseTimer;
+        private float pulsetime;
+        private DateTime lasttick;
 
         #endregion
 
@@ -37,25 +39,46 @@ namespace MindMurmur.Lights
 
         #region ctor
 
-        public LightManager(DMX dmx) {
+        public LightManager(DMX dmx)
+        {
             CurrentColor = Color.Aqua;
             CurrentHeartRate = 50;
             LightDMX = dmx;
             bpmMonitor = new HeartRateMonitor(dmx);
             colorMonitor = new ColorMonitor(dmx);
-            heartRateBlinkTimer = new Timer(HeartRateBlinkTimer_Tick, null, Timeout.Infinite, Timeout.Infinite);
+            // 25 FPS timer to update LEDs 
+            heartRatePulseTimer = new Timer(PulseTimer_Tick, null, Timeout.Infinite, Timeout.Infinite);
         }
         #endregion
 
+
         /// <summary>
-        /// timer event that initiates the lights blinking at the same rate of the heartbeat
+        /// timer event that initiates the lights according to the current color and pulse
         /// </summary>
         /// <param name="state"></param>
-        private void HeartRateBlinkTimer_Tick(object state)
+        private void PulseTimer_Tick(object state)
         {
-            Debug.WriteLine("Tick");
-            if (this.LightDMX.IsConnected)
-                LightDMX.HeartRateBlink(CurrentColor);
+
+            var deltatime = DateTime.UtcNow - lasttick;
+            lasttick = DateTime.UtcNow;
+            //move pulse timer from heartbeat rate
+            pulsetime += (float)deltatime.TotalSeconds * (CurrentHeartRate / 60f);
+            // restrict value between 0 and 1
+            pulsetime -= (float)Math.Floor(pulsetime);
+
+            // 0 = top | 0.5 = low | 1 = top
+            int alpha = (int)(255 * (1 - Math.Sin(pulsetime * Math.PI)));
+            Color fadedColor = Color.FromArgb(alpha,
+                                              CurrentColor.R,
+                                              CurrentColor.G,
+                                              CurrentColor.B);
+
+            byte[] dmx = this.LightDMX.GetDMXFromColors(new List<Color> { fadedColor });
+            LightDMX.SendDMXFrames(dmx);
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.WriteLine($"LED COLOR: {fadedColor.ToString()}");
+            Console.ForegroundColor = ConsoleColor.White;
+
         }
 
         //public void StartTimerInOneMinute()
@@ -80,55 +103,63 @@ namespace MindMurmur.Lights
         {
             var bus = RabbitHutch.CreateBus("host=localhost");
             // Start DMX
-            if (LightDMX != null)
-                await LightDMX.Connect();
+            try
+            {
+                if (LightDMX != null)
+                    await LightDMX.Connect();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("ERROR: DMX controller not found. continuing...");
+            }
+
 
             if (CurrentHeartRate < 20) CurrentHeartRate = 20;
 
             //bind it to the console
-            bpmSubject.SubscribeConsole();
-            colorSubject.SubscribeConsole();
+            //bpmSubject.SubscribeConsole();
+            //colorSubject.SubscribeConsole();
 
-            bpmSubject.Throttle(TimeSpan.FromMilliseconds(300))
-                .DistinctUntilChanged()
-                .Subscribe(bpmMonitor);
+            //bpmSubject.Throttle(TimeSpan.FromMilliseconds(300))
+            //    .DistinctUntilChanged()
+            //    .Subscribe(bpmMonitor);
 
-            colorSubject.Throttle(TimeSpan.FromMilliseconds(300))
-                .DistinctUntilChanged()
-                .Subscribe(colorMonitor);
+            //colorSubject.Throttle(TimeSpan.FromMilliseconds(300))
+            //    .DistinctUntilChanged()
+            //    .Subscribe(colorMonitor);
 
-            heartRateBlinkTimer.Change(5, GetHeartRateTimer(CurrentHeartRate));
             bus.Subscribe<HeartRateCommand>("heartRateCommand", (cmd) =>
             {
-                Console.ForegroundColor = ConsoleColor.DarkRed;
-                Console.WriteLine($"Heart.Rx {cmd.CommandId}");
-                Console.ForegroundColor = ConsoleColor.White;
-                bpmSubject.OnNext(cmd.HeartRate);
-                CurrentHeartRate = cmd.HeartRate;
-                //change the heart beat timer
-                heartRateBlinkTimer.Change(5, GetHeartRateTimer(CurrentHeartRate));
-            });
-            
-            bus.Subscribe<ColorControlCommand>("colorCommand", (cmd) => {
-                Console.ForegroundColor = ConsoleColor.DarkYellow;
-                Console.WriteLine($"Color.Rx {cmd.CommandId}");
-                Console.ForegroundColor = ConsoleColor.White;
-                var thisColor = Color.FromArgb(cmd.ColorRed, cmd.ColorGreen, cmd.ColorBlue);
-
-                //if we have a new color, then we want to send this directly to the lights
-                if (this.LightDMX.IsConnected && thisColor!=CurrentColor)
+                if (CurrentHeartRate != cmd.HeartRate)
                 {
-                    byte[] dmx = this.LightDMX.GetDMXFromColors(new List<Color> { thisColor });
-                    LightDMX.SendDMXFrames(dmx);
+                    Console.ForegroundColor = ConsoleColor.DarkRed;
+                    Console.WriteLine($"Heart.Rx {cmd.CommandId}");
+                    Console.ForegroundColor = ConsoleColor.White;
+                    CurrentHeartRate = cmd.HeartRate;
+                    bpmSubject.OnNext(cmd.HeartRate);
                 }
-                CurrentColor = thisColor;
-                colorSubject.OnNext(thisColor);
             });
+
+            bus.Subscribe<ColorControlCommand>("colorCommand", (cmd) => {
+                Color cmdColor = Color.FromArgb(cmd.ColorRed, cmd.ColorGreen, cmd.ColorBlue);
+                if (CurrentColor != cmdColor)
+                {
+                    Console.ForegroundColor = ConsoleColor.DarkYellow;
+                    Console.WriteLine($"Color.Rx {cmd.CommandId}");
+                    Console.ForegroundColor = ConsoleColor.White;
+                    CurrentColor = cmdColor;
+                    colorSubject.OnNext(cmdColor);
+                }
+            });
+
+            // set pulse timer @ 25 FPS to update LEDs
+            heartRatePulseTimer.Change(TimeSpan.Zero, TimeSpan.FromMilliseconds(40));
+
         }
 
         static int GetHeartRateTimer(int bpm)
         {
-            return Convert.ToInt32((Convert.ToDouble(bpm) / 60.0))*1000;
+            return Convert.ToInt32((Convert.ToDouble(bpm) / 60.0)) * 1000;
         }
 
         public async Task RunTestsTask()
@@ -140,38 +171,38 @@ namespace MindMurmur.Lights
         }
 
         //async private void MainTimer_Tick(object State)
-            //{
-            //    if (CurrentHeartRate < 20) CurrentHeartRate = 20;
+        //{
+        //    if (CurrentHeartRate < 20) CurrentHeartRate = 20;
 
-            //    //mainTimer.Change(Timeout.Infinite, Timeout.Infinite);
-            //    /// LIGHTS
-            //    /// Run the visualization
-            //    /// And send the colors to DMX. (unless stopped)
-            //    try
-            //    {
-            //        if (this.LightDMX.IsConnected)
-            //        {
-            //            byte[] dmx = this.LightDMX.GetDMXFromColors(new List<Color> { CurrentColor });
-            //            LightDMX.SendDMXFrames(dmx);
-            //        }
-            //    }
-            //    catch (Exception TimerException)
-            //    {
-            //        Console.ForegroundColor = ConsoleColor.Red; Console.WriteLine("[!] Error during MainTimer");
-            //        Console.ForegroundColor = ConsoleColor.White; Console.WriteLine(TimerException.ToString());
-            //    }
-            //   // mainTimer.Change(40, 40);
-            //}
+        //    //mainTimer.Change(Timeout.Infinite, Timeout.Infinite);
+        //    /// LIGHTS
+        //    /// Run the visualization
+        //    /// And send the colors to DMX. (unless stopped)
+        //    try
+        //    {
+        //        if (this.LightDMX.IsConnected)
+        //        {
+        //            byte[] dmx = this.LightDMX.GetDMXFromColors(new List<Color> { CurrentColor });
+        //            LightDMX.SendDMXFrames(dmx);
+        //        }
+        //    }
+        //    catch (Exception TimerException)
+        //    {
+        //        Console.ForegroundColor = ConsoleColor.Red; Console.WriteLine("[!] Error during MainTimer");
+        //        Console.ForegroundColor = ConsoleColor.White; Console.WriteLine(TimerException.ToString());
+        //    }
+        //   // mainTimer.Change(40, 40);
+        //}
 
-            //private void HandleColorControlCommand(ColorControlCommand cmd)
-            //{
-            //    CurrentColor = Color.FromArgb(cmd.ColorRed, cmd.ColorGreen, cmd.ColorBlue);
-            //   // ColorQueue.Enqueue(cmd);
-            //}
-            //private void HandleHeartRateCommand(HeartRateCommand cmd)
-            //{
-            //    CurrentHeartRate = cmd.HeartRate;
-            //    //HeartRateQueue.Enqueue(cmd);
-            //}
-        }
+        //private void HandleColorControlCommand(ColorControlCommand cmd)
+        //{
+        //    CurrentColor = Color.FromArgb(cmd.ColorRed, cmd.ColorGreen, cmd.ColorBlue);
+        //   // ColorQueue.Enqueue(cmd);
+        //}
+        //private void HandleHeartRateCommand(HeartRateCommand cmd)
+        //{
+        //    CurrentHeartRate = cmd.HeartRate;
+        //    //HeartRateQueue.Enqueue(cmd);
+        //}
+    }
 }
