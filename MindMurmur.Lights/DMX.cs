@@ -35,9 +35,9 @@ namespace MindMurmur.Lights
                 Console.ForegroundColor = ConsoleColor.White; Console.WriteLine("[ ] Loading DMX Controller...");
                 DMXController = new DMXController();
                 DMXController.StartDevice();
-                DMXController.SetChannelCount(8);
+                DMXController.SetChannelCount(16);
                 await Task.Delay(2000);
-                DMXController.SetChannelCount(8);
+                DMXController.SetChannelCount(16);
                 await Task.Delay(2000);
                 Console.ForegroundColor = ConsoleColor.White; Console.WriteLine("[<] DMX: SetChannelCount: " + maxChannel);
                 IsConnected = true;
@@ -80,40 +80,94 @@ namespace MindMurmur.Lights
             //// V3 k8062
             for (int i = 0; i < 2; i++)
                 for (int channel = 0; channel < channelsdata.Length; channel++)
-                    DMXController.SetChannel((short)(channel + 10 + (channelsdata.Length * i)), channelsdata[channel]);
+                    DMXController.SetChannel((short)(channel + 8 + (channelsdata.Length * i)), channelsdata[channel]);
         }
 
         public async Task TestSequence()
         {
+
+            DMXController.SetChannelCount(8);
+
             Console.ForegroundColor = ConsoleColor.White; Console.WriteLine("[ ] Testing lights...");
             foreach (var color in new Color[] { Color.Red, Color.Green, Color.Blue, Color.Yellow, Color.Orange, Color.Cyan, Color.Pink, Color.Purple, Color.White, Color.LightGray, Color.Gray, Color.DarkGray, Color.Black })
             {
                 SetColor(color);
                 Debug.WriteLine(color.ToString());
-                await Task.Delay(300);
+                await Task.Delay(400);
             }
             Console.ForegroundColor = ConsoleColor.Green; Console.WriteLine("[-] Done testing");
+
+
+            await Task.Delay(1000);
+
+            DMXController.SetChannelCount(16);
+
+            Console.ForegroundColor = ConsoleColor.White; Console.WriteLine("[ ] Testing lights... 16");
+            foreach (var color in new Color[] { Color.Red, Color.Green, Color.Blue, Color.Yellow, Color.Orange, Color.Cyan, Color.Pink, Color.Purple, Color.White, Color.LightGray, Color.Gray, Color.DarkGray, Color.Black })
+            {
+                SetColor(color);
+                Debug.WriteLine(color.ToString());
+                await Task.Delay(400);
+            }
+            Console.ForegroundColor = ConsoleColor.Green; Console.WriteLine("[-] Done testing");
+
+            await Task.Delay(1000);
+
+            DMXController.SetChannelCount(32);
+
+            Console.ForegroundColor = ConsoleColor.White; Console.WriteLine("[ ] Testing lights... 32");
+            foreach (var color in new Color[] { Color.Red, Color.Green, Color.Blue, Color.Yellow, Color.Orange, Color.Cyan, Color.Pink, Color.Purple, Color.White, Color.LightGray, Color.Gray, Color.DarkGray, Color.Black })
+            {
+                SetColor(color);
+                Debug.WriteLine(color.ToString());
+                await Task.Delay(400);
+            }
+            Console.ForegroundColor = ConsoleColor.Green; Console.WriteLine("[-] Done testing");
+
         }
+
         public async Task Test()
         {
             DMXController.SetChannelCount(8);
+
+            byte max = 255;
+            byte high = 200;
+            byte med = 100;
+            byte low = 50;
+            byte verylow = 15;
+
             while (true)
             {
-                Debug.Write("SetChannel");
-                for (short i = 1; i < 9; i++)
+                Debug.WriteLine("SetChannel");
+                for (short i = 8; i < 11; i++)
                 {
-                    DMXController.SetChannel(i, 245);
-                    Debug.Write($"({i}:{245})");
+                    DMXController.SetChannel(i, max);
+                    Debug.WriteLine($"({i}:{max})");
+                    Thread.Sleep(300);
+                    DMXController.SetChannel(i, high);
+                    Debug.WriteLine($"({i}:{high})");
+                    Thread.Sleep(300);
+                    DMXController.SetChannel(i, med);
+                    Debug.WriteLine($"({i}:{med})");
+                    Thread.Sleep(300);
+                    DMXController.SetChannel(i, low);
+                    Debug.WriteLine($"({i}:{low})");
+                    Thread.Sleep(300);
+                    DMXController.SetChannel(i, verylow);
+                    Debug.WriteLine($"({i}:{verylow})");
+                    Thread.Sleep(300);
+                    DMXController.SetChannel(i, max);
+                    Thread.Sleep(800);
+                    DMXController.SetChannel(i, verylow);
+                    Thread.Sleep(800);
                 }
-                Debug.WriteLine("");
-                Thread.Sleep(250);
             }
         }
 
 
         public void SetColor(Color color)
         {
-            byte[] dmxdata = GetDMXFromColors(new Color[] { color, color, color, color, color, color });
+            byte[] dmxdata = GetDMXFromColors(new Color[] { color, color, color, color, color, color, color });
             Console.ForegroundColor = ConsoleColor.White;
             Console.WriteLine("[ ] " + color.ToString() + ": (" + dmxdata[0] + "," + dmxdata[1] + "," + dmxdata[2] + ") ");
             SendDMXFrames(dmxdata);
@@ -128,13 +182,14 @@ namespace MindMurmur.Lights
 
             byte[] dmxdataDark = GetDMXFromColors(new Color[]
                 {Color.FromArgb(0, 10, 10, 10)});
-            byte[] dmxdata = GetDMXFromColors(new Color[] { currentColor });
+            byte[] dmxdata = GetDMXFromColors(new Color[] { currentColor, currentColor, currentColor, currentColor, currentColor, currentColor, currentColor });
             Console.ForegroundColor = ConsoleColor.DarkBlue;
             Console.WriteLine("[ BLINK ]     " + currentColor.ToString() + ": (" + dmxdataDark[0] + "," + dmxdataDark[1] + "," + dmxdataDark[2] + ") ");
             Thread.Sleep(100);
             SendDMXFrames(dmxdataDark);
             Console.ForegroundColor = ConsoleColor.White;
             Console.WriteLine("[ BLINKBACK ] " + currentColor.ToString() + ": (" + dmxdata[0] + "," + dmxdata[1] + "," + dmxdata[2] + ") ");
+            SendDMXFrames(dmxdata);
         }
 
         public void Dispose()
@@ -154,3 +209,4 @@ namespace MindMurmur.Lights
         }
     }
 }
+

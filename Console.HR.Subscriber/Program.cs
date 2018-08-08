@@ -21,9 +21,8 @@ namespace Console.HR.Subscriber
         {
             using (var bus = RabbitHutch.CreateBus("host=localhost"))
             {
-                //bus.Subscribe<HRMPacket>("Console.HR.Subscriber.HRMPacket", HandlePacketMessage);
-                //bus.Subscribe<HRMStatus>("Console.HR.Subscriber.HRMStatus", HandleStatusMessage);
                 bus.Subscribe<ColorControlCommand>("Commands.ColorControl", HandleColorControlCommand);
+                bus.Subscribe<MeditationStateCommand>("Commands.MeditationState", MeditationStateCommand);
                 bus.Subscribe<HeartRateCommand>("Commands.HeartRate", HandleHeartRateCommand);
 
                 System.Console.WriteLine("Listening for messages. Hit <return> to quit.");
@@ -31,6 +30,10 @@ namespace Console.HR.Subscriber
             }
         }
 
+        private static void MeditationStateCommand(MeditationStateCommand obj)
+        {
+            throw new NotImplementedException();
+        }
         private static void HandleColorControlCommand(ColorControlCommand obj)
         {
             throw new NotImplementedException();

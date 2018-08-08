@@ -79,6 +79,7 @@
     <Reference Include="WindowsBase" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="MeditationMonitor.cs" />
     <Compile Include="ColorMonitor.cs" />
     <Compile Include="Control\Config.cs" />
     <Compile Include="DMX.cs" />

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using MindMurmur.Domain.Light;
 
 namespace MindMurmur.Lights.Control
 {
@@ -11,7 +12,7 @@ namespace MindMurmur.Lights.Control
         /// <summary>
         /// Channels currently configured for LED lights
         /// </summary>
-        public static List<short> LightStripList = new List<short>();
+        public static List<LightStrip> LightStripList = new List<LightStrip>();
 
         /// <summary>
         /// Frequency for updates
@@ -23,17 +24,31 @@ namespace MindMurmur.Lights.Control
         }
 
         public static void Init() {
-            LightStripList.Add(1);
-            //LightStripList.Add(6);
-            //LightStripList.Add(11);
-            //LightStripList.Add(16);
-            //LightStripList.Add(21);
+            LightStripList.Add(new LightStrip(1,1)); //this is the cheap light that already is connected
+
+            LightStripList.Add(new LightStrip(12, 1));
+            LightStripList.Add(new LightStrip(16, 1));
+            LightStripList.Add(new LightStrip(20, 1));
+
+            //Chandelier
+            LightStripList.Add(new LightStrip(50, 1));
+            LightStripList.Add(new LightStrip(54, 1));
+            LightStripList.Add(new LightStrip(58, 1));
+            LightStripList.Add(new LightStrip(62, 72)); //this is the cheap light that already is connected
         }
 
         public static short MaxChannels
         {
-            get { return Convert.ToInt16(LightStripList.Max() + 4); }
+            get
+            {
+                short maxChannel = 0;
+                foreach (LightStrip strip in LightStripList)
+                {
+                    if (strip.MaxChannel > maxChannel)
+                        maxChannel = strip.MaxChannel;
+                }
+                return maxChannel;
+            }
         }
-
     }
 }

@@ -61,8 +61,16 @@ namespace MindMurmur.Lights
                     x =>
                     {
                         var random = new Random();
-                        var colorCmd = new ColorControlCommand() { CommandId = Guid.NewGuid().ToString(), ColorBlue = Convert.ToInt16(random.Next(1, 210)), ColorGreen = Convert.ToInt16(random.Next(1, 210)), ColorRed = Convert.ToInt16(random.Next(1, 210)) };
-                        var heartCmd = new HeartRateCommand() { CommandId = Guid.NewGuid().ToString(), HeartRate = Convert.ToInt16(random.Next(60, 170)) };
+                        var colorCmd = new MeditationStateCommand()
+                        {
+                            CommandId = Guid.NewGuid().ToString(),
+                            State = Convert.ToInt16(random.Next(1, 5))
+                        };
+                        var heartCmd = new HeartRateCommand()
+                        {
+                            CommandId = Guid.NewGuid().ToString(),
+                            HeartRate = Convert.ToInt16(random.Next(60, 170))
+                        };
 
                         bus.Publish(colorCmd);
                         Console.BackgroundColor = ConsoleColor.DarkRed;

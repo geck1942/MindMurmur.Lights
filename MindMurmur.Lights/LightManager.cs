@@ -21,7 +21,9 @@ namespace MindMurmur.Lights
         private IObservable<int> HeartRate;
         private Subject<int> bpmSubject = new Subject<int>();
         private Subject<Color> colorSubject = new Subject<Color>();
+        private Subject<MeditationState> meditationSubject = new Subject<MeditationState>();
         HeartRateMonitor bpmMonitor;
+        MeditationMonitor meditationMonitor;
         ColorMonitor colorMonitor;
         private Timer heartRateBlinkTimer;
 
@@ -29,6 +31,7 @@ namespace MindMurmur.Lights
 
         #region Public Properties
 
+        public MeditationState CurrentMediationState { get; set; }
         private int CurrentHeartRate { get; set; }
         public Color CurrentColor { get; set; }
         public DMX LightDMX { get; set; }
@@ -43,9 +46,12 @@ namespace MindMurmur.Lights
             LightDMX = dmx;
             bpmMonitor = new HeartRateMonitor(dmx);
             colorMonitor = new ColorMonitor(dmx);
+            meditationMonitor = new MeditationMonitor(dmx);
             heartRateBlinkTimer = new Timer(HeartRateBlinkTimer_Tick, null, Timeout.Infinite, Timeout.Infinite);
         }
         #endregion
+
+        #region Timers
 
         /// <summary>
         /// timer event that initiates the lights blinking at the same rate of the heartbeat
@@ -57,6 +63,8 @@ namespace MindMurmur.Lights
             if (this.LightDMX.IsConnected)
                 LightDMX.HeartRateBlink(CurrentColor);
         }
+
+        #endregion 
 
         //public void StartTimerInOneMinute()
         //{
@@ -88,6 +96,7 @@ namespace MindMurmur.Lights
             //bind it to the console
             bpmSubject.SubscribeConsole();
             colorSubject.SubscribeConsole();
+            meditationSubject.SubscribeConsole();
 
             bpmSubject.Throttle(TimeSpan.FromMilliseconds(300))
                 .DistinctUntilChanged()
@@ -96,6 +105,10 @@ namespace MindMurmur.Lights
             colorSubject.Throttle(TimeSpan.FromMilliseconds(300))
                 .DistinctUntilChanged()
                 .Subscribe(colorMonitor);
+
+            meditationSubject.Throttle(TimeSpan.FromMilliseconds(300))
+                .DistinctUntilChanged()
+                .Subscribe(meditationMonitor);
 
             heartRateBlinkTimer.Change(5, GetHeartRateTimer(CurrentHeartRate));
             bus.Subscribe<HeartRateCommand>("heartRateCommand", (cmd) =>
@@ -124,6 +137,16 @@ namespace MindMurmur.Lights
                 CurrentColor = thisColor;
                 colorSubject.OnNext(thisColor);
             });
+
+            bus.Subscribe<MeditationStateCommand>("meditationStateCommand", (cmd) => {
+                Console.ForegroundColor = ConsoleColor.DarkYellow;
+                Console.WriteLine($"MeditationState.Rx {cmd.CommandId}");
+                Console.ForegroundColor = ConsoleColor.White;
+                var thisState = (MeditationState)cmd.State;
+
+                CurrentMediationState = thisState;
+                meditationSubject.OnNext(thisState);
+            });
         }
 
         static int GetHeartRateTimer(int bpm)
@@ -136,6 +159,7 @@ namespace MindMurmur.Lights
             if (LightDMX != null)
                 await LightDMX.Connect();
 
+           // await LightDMX.TestSequence().ConfigureAwait(true);
             await LightDMX.Test().ConfigureAwait(true);
         }
 
