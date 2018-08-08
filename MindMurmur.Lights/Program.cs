@@ -13,8 +13,8 @@ namespace MindMurmur.Lights
         {
             //initialize config
             Config.Init();
-            StartLightManagerTest();
-           // StartLightManager();
+            //StartLightManagerTest();
+            StartLightManager();
             Console.WriteLine("Listening for messages. Hit <return> to quit.");
             Console.ReadLine();
         }
