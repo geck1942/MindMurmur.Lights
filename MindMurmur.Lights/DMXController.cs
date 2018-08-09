@@ -83,7 +83,7 @@ namespace MindMurmur.Lights
         public void SetChannel(short channel, byte value)
         {
             if (channel <= 0 || channel > 512)
-                throw new ArgumentOutOfRangeException("Parameter 'channel' must be greather then 0 and less then or equal to 512");
+                throw new ArgumentOutOfRangeException("Parameter 'channel' must be greater then 0 and less then or equal to 512");
             SetShareData(channel + CHANNEL_OFFSET, (int)value);
         }
 

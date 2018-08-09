@@ -5,14 +5,16 @@ using System.Drawing;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using MindMurmur.Domain.Light;
+using MindMurmur.Lights.Control;
 
 namespace MindMurmur.Lights
 {
     public class DMX : IDisposable
     {
         private DMXController DMXController;
-        private short maxChannel = 8;
-  
+        private short maxChannel = 512;
+
         public bool IsConnected = false;
 
         public DMX(short channelCount)
@@ -35,9 +37,9 @@ namespace MindMurmur.Lights
                 Console.ForegroundColor = ConsoleColor.White; Console.WriteLine("[ ] Loading DMX Controller...");
                 DMXController = new DMXController();
                 DMXController.StartDevice();
-                DMXController.SetChannelCount(16);
+                DMXController.SetChannelCount(512);
                 await Task.Delay(2000);
-                DMXController.SetChannelCount(16);
+                DMXController.SetChannelCount(512);
                 await Task.Delay(2000);
                 Console.ForegroundColor = ConsoleColor.White; Console.WriteLine("[<] DMX: SetChannelCount: " + maxChannel);
                 IsConnected = true;
@@ -83,53 +85,66 @@ namespace MindMurmur.Lights
                     DMXController.SetChannel((short)(channel + 8 + (channelsdata.Length * i)), channelsdata[channel]);
         }
 
+        public void SetColor(Color color)
+        {
+            byte[] dmxdata = GetDMXFromColors(new Color[] { color, color, color, color, color, color, color });
+            Console.ForegroundColor = ConsoleColor.White;
+            Console.WriteLine("[" + color.ToString() + "]: (" + dmxdata[0] + "," + dmxdata[1] + "," + dmxdata[2] + ") ");
+            SendDMXFrames(dmxdata);
+        }
+
+        public void SetLightStripColor(LightStrip strip, Color color)
+        {
+            var channels = strip.ChannelColors(color);
+            foreach (var key in channels.Keys)
+            {
+                DMXController.SetChannel(key, channels[key]);
+            }
+        }
+        /// <summary>
+        /// Blinks the LED lights from whatever the current color is, marking it darker and then back to the normal color 
+        /// </summary>
+        /// <param name="currentColor"></param>
+        public void HeartRateBlink(Color currentColor)
+        {
+            byte[] dmxdataDark = GetDMXFromColors(new Color[]
+                {Color.FromArgb(0, 10, 10, 10)});
+            byte[] dmxdata = GetDMXFromColors(new Color[] { currentColor, currentColor, currentColor, currentColor, currentColor, currentColor, currentColor });
+            Console.ForegroundColor = ConsoleColor.DarkBlue;
+            Console.WriteLine("[ BLINK ]     " + currentColor.ToString() + ": (" + dmxdataDark[0] + "," + dmxdataDark[1] + "," + dmxdataDark[2] + ") ");
+            Thread.Sleep(100);
+            SendDMXFrames(dmxdataDark);
+            Console.ForegroundColor = ConsoleColor.White;
+            Console.WriteLine("[ BLINKBACK ] " + currentColor.ToString() + ": (" + dmxdata[0] + "," + dmxdata[1] + "," + dmxdata[2] + ") ");
+            SendDMXFrames(dmxdata);
+        }
+
+        public void Dispose()
+        {
+            if (this.DMXController != null && IsConnected)
+                this.DMXController.Dispose();
+            VellemanDMX.StopDevice();
+        }
+        
+        #region Testing
+
         public async Task TestSequence()
         {
-
-            DMXController.SetChannelCount(8);
-
             Console.ForegroundColor = ConsoleColor.White; Console.WriteLine("[ ] Testing lights...");
             foreach (var color in new Color[] { Color.Red, Color.Green, Color.Blue, Color.Yellow, Color.Orange, Color.Cyan, Color.Pink, Color.Purple, Color.White, Color.LightGray, Color.Gray, Color.DarkGray, Color.Black })
             {
-                SetColor(color);
-                Debug.WriteLine(color.ToString());
+                foreach (LightStrip strip in Config.LightStripList)
+                {
+                    SetLightStripColor(strip,color);
+                }
+               // SetColor(color);
                 await Task.Delay(400);
             }
             Console.ForegroundColor = ConsoleColor.Green; Console.WriteLine("[-] Done testing");
-
-
-            await Task.Delay(1000);
-
-            DMXController.SetChannelCount(16);
-
-            Console.ForegroundColor = ConsoleColor.White; Console.WriteLine("[ ] Testing lights... 16");
-            foreach (var color in new Color[] { Color.Red, Color.Green, Color.Blue, Color.Yellow, Color.Orange, Color.Cyan, Color.Pink, Color.Purple, Color.White, Color.LightGray, Color.Gray, Color.DarkGray, Color.Black })
-            {
-                SetColor(color);
-                Debug.WriteLine(color.ToString());
-                await Task.Delay(400);
-            }
-            Console.ForegroundColor = ConsoleColor.Green; Console.WriteLine("[-] Done testing");
-
-            await Task.Delay(1000);
-
-            DMXController.SetChannelCount(32);
-
-            Console.ForegroundColor = ConsoleColor.White; Console.WriteLine("[ ] Testing lights... 32");
-            foreach (var color in new Color[] { Color.Red, Color.Green, Color.Blue, Color.Yellow, Color.Orange, Color.Cyan, Color.Pink, Color.Purple, Color.White, Color.LightGray, Color.Gray, Color.DarkGray, Color.Black })
-            {
-                SetColor(color);
-                Debug.WriteLine(color.ToString());
-                await Task.Delay(400);
-            }
-            Console.ForegroundColor = ConsoleColor.Green; Console.WriteLine("[-] Done testing");
-
         }
-
+        
         public async Task Test()
         {
-            DMXController.SetChannelCount(8);
-
             byte max = 255;
             byte high = 200;
             byte med = 100;
@@ -138,8 +153,14 @@ namespace MindMurmur.Lights
 
             while (true)
             {
-                Debug.WriteLine("SetChannel");
-                for (short i = 8; i < 11; i++)
+                //for (short i = 1; i < 512; i++)
+                //{
+                //    DMXController.SetChannel(i, max);
+                //    Debug.WriteLine($"({i}:{max})");
+                //    Thread.Sleep(100);
+                //}
+
+                for (short i = 8; i < 20; i++)
                 {
                     DMXController.SetChannel(i, max);
                     Debug.WriteLine($"({i}:{max})");
@@ -164,49 +185,7 @@ namespace MindMurmur.Lights
             }
         }
 
-
-        public void SetColor(Color color)
-        {
-            byte[] dmxdata = GetDMXFromColors(new Color[] { color, color, color, color, color, color, color });
-            Console.ForegroundColor = ConsoleColor.White;
-            Console.WriteLine("[ ] " + color.ToString() + ": (" + dmxdata[0] + "," + dmxdata[1] + "," + dmxdata[2] + ") ");
-            SendDMXFrames(dmxdata);
-        }
-
-        /// <summary>
-        /// Blinks the LED lights from whatever the current color is, marking it darker and then back to the normal color 
-        /// </summary>
-        /// <param name="currentColor"></param>
-        public void HeartRateBlink(Color currentColor)
-        {
-
-            byte[] dmxdataDark = GetDMXFromColors(new Color[]
-                {Color.FromArgb(0, 10, 10, 10)});
-            byte[] dmxdata = GetDMXFromColors(new Color[] { currentColor, currentColor, currentColor, currentColor, currentColor, currentColor, currentColor });
-            Console.ForegroundColor = ConsoleColor.DarkBlue;
-            Console.WriteLine("[ BLINK ]     " + currentColor.ToString() + ": (" + dmxdataDark[0] + "," + dmxdataDark[1] + "," + dmxdataDark[2] + ") ");
-            Thread.Sleep(100);
-            SendDMXFrames(dmxdataDark);
-            Console.ForegroundColor = ConsoleColor.White;
-            Console.WriteLine("[ BLINKBACK ] " + currentColor.ToString() + ": (" + dmxdata[0] + "," + dmxdata[1] + "," + dmxdata[2] + ") ");
-            SendDMXFrames(dmxdata);
-        }
-
-        public void Dispose()
-        {
-            if (this.DMXController != null && IsConnected)
-                this.DMXController.Dispose();
-            VellemanDMX.StopDevice();
-        }
-
-        /// <summary>
-        /// sets the maximum channels that thi will be sending DMX data to
-        /// </summary>
-        /// <param name="channelCount"></param>
-        public void SetMaxChannel(short channelCount)
-        {
-            maxChannel = channelCount;
-        }
+        #endregion 
     }
 }
 

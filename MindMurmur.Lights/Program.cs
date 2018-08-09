@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Linq;
 using System.Reactive.Linq;
 using EasyNetQ;
 using MindMurmur.Domain.Messages;
@@ -11,25 +10,24 @@ namespace MindMurmur.Lights
     {
         static void Main(string[] args)
         {
+            var keepRunning = true;
             //initialize config
             Config.Init();
+            //StartTimerForTestEvents();
             StartLightManagerTest();
-           // StartLightManager();
-            Console.WriteLine("Listening for messages. Hit <return> to quit.");
-            Console.ReadLine();
+            //StartLightManager();
+            Console.WriteLine("Listening for messages. Hit < return > to quit.");
         }
 
         public static void StartLightManager()
         {
             Console.WriteLine("Shows use of Start to start on a background thread:");
             //StartTimerForTestEvents();
-            
             var o = Observable.Start(async () =>
             {
                 Console.WriteLine("StartLightManager...");
                 var manager = new LightManager(new DMX(Config.MaxChannels));
                 await manager.Start();
-                //await manager.RunTestsTask();
                 Console.WriteLine("Background work completed.");
             }).Finally(() => Console.WriteLine("Main thread completed."));
             Console.WriteLine("\r\n\t In Main Thread...\r\n");
@@ -38,17 +36,21 @@ namespace MindMurmur.Lights
 
         public static void StartLightManagerTest()
         {
-            Console.WriteLine("Shows use of Start to start on a background thread:");
+            Console.WriteLine("Press any key EXCEPT FOR < return > to start testing.  Press < return > when given the option to stop testing.");
+            var manager = new LightManager(new DMX(Config.MaxChannels));
+            manager.HitchToTheBus();//add subscriptions to the bus
 
-            var o = Observable.Start(async () =>
+            while (Console.ReadKey().Key != ConsoleKey.Enter)
             {
-                Console.WriteLine("StartLightManager...");
-                var manager = new LightManager(new DMX(Config.MaxChannels));
-                await manager.RunTestsTask();
-                Console.WriteLine("Background work completed.");
-            }).Finally(() => Console.WriteLine("Main thread completed."));
-            Console.WriteLine("\r\n\t In Main Thread...\r\n");
-            o.Wait();   // Wait for completion of background operation.
+                var o = Observable.Start(async () =>
+                {
+                    Console.WriteLine("StartLightManager...");
+                    await manager.RunTestsTask();
+                    Console.WriteLine("Background work completed.");
+                }).Finally(() => Console.WriteLine("Main thread completed."));
+                Console.WriteLine("\r\n\t Press Enter to ...\r\n");
+                o.Wait();   // Wait for completion of background operation.
+            }
         }
 
         public static void StartTimerForTestEvents()
@@ -61,10 +63,10 @@ namespace MindMurmur.Lights
                     x =>
                     {
                         var random = new Random();
-                        var colorCmd = new MeditationStateCommand()
+                        var mediationStateCmd = new MeditationStateCommand()
                         {
                             CommandId = Guid.NewGuid().ToString(),
-                            State = Convert.ToInt16(random.Next(1, 5))
+                            State = Convert.ToInt16(random.Next(-1, 5))
                         };
                         var heartCmd = new HeartRateCommand()
                         {
@@ -72,15 +74,16 @@ namespace MindMurmur.Lights
                             HeartRate = Convert.ToInt16(random.Next(60, 170))
                         };
 
-                        bus.Publish(colorCmd);
+                        bus.Publish(mediationStateCmd);
                         Console.BackgroundColor = ConsoleColor.DarkRed;
-                        Console.WriteLine("Published test color command.");
+                        Console.WriteLine("Published test MeditationStateCommand.");
 
                         bus.Publish(heartCmd);
-                        Console.WriteLine("Published test heart beat command.");
+                        Console.WriteLine("Published test HeartRateCommand.");
                         Console.BackgroundColor = ConsoleColor.Black;
                         Console.ForegroundColor = ConsoleColor.White;
                     });
+            Console.WriteLine("StartTimerForTestEvents()....");
         }
     }
 
