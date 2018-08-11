@@ -42,6 +42,8 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Enums.cs" />
+    <Compile Include="Light\LightExtensions.cs" />
     <Compile Include="Light\LightStrip.cs" />
     <Compile Include="Light\LED.cs" />
     <Compile Include="HeartMonitor\HeartRateMessage.cs" />

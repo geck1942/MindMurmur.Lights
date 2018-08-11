@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using MindMurmur.Domain;
 using MindMurmur.Domain.Light;
 
 namespace MindMurmur.Lights.Control
@@ -19,13 +21,14 @@ namespace MindMurmur.Lights.Control
         /// Frequency for updates
         /// </summary>
         public static int TimerMs = 500;
+        public static Int16 DimmerValue = -1; //TODO: make this a config value
 
         static Config() {
 
         }
 
         public static void Init() {
-            LightStripList.Add(new LightStrip(1,1)); //this is the cheap light that already is connected
+            LightStripList.Add(new LightStrip(1,1, DimmerValue, false)); //this is the cheap light that already is connected
 
             //LightStripList.Add(new LightStrip(12, 1));
             //LightStripList.Add(new LightStrip(16, 1));
@@ -56,5 +59,61 @@ namespace MindMurmur.Lights.Control
                 return maxChannel;
             }
         }
+
+        public static Dictionary<MeditationState, Tuple<Color, Color, Color>> MeditationColors =
+            new Dictionary<MeditationState, Tuple<Color, Color, Color>>()
+            {
+                {
+                    MeditationState.OFF,
+                    new Tuple<Color, Color, Color>(
+                        Color.FromArgb(255, 0, 0, 0),
+                        Color.FromArgb(255, 0, 0, 0),
+                        Color.FromArgb(255, 0, 0, 0))
+                },
+                {
+                    MeditationState.IDLE,
+                        new Tuple<Color, Color, Color>(
+                            Color.FromArgb(255, 204, 0, 255), 
+                            Color.FromArgb(255, 0, 255, 24),
+                            Color.FromArgb(255, 0, 24, 255))
+                },
+                {
+                    MeditationState.LEVEL_4,
+                    new Tuple<Color, Color, Color>(
+                        Color.FromArgb(255, 0, 192, 255),
+                        Color.FromArgb(255, 255, 188, 0),
+                        Color.FromArgb(255, 0, 255, 150))
+                },
+                {
+                    MeditationState.LEVEL_3,
+                    new Tuple<Color, Color, Color>(
+                        Color.FromArgb(255, 0, 255, 0),
+                        Color.FromArgb(255, 181, 0, 255),
+                        Color.FromArgb(255,  255, 220, 0))
+                },
+                {
+                    MeditationState.LEVEL_2,
+                    new Tuple<Color, Color, Color>(
+                        Color.FromArgb(255, 255, 210, 0),
+                        Color.FromArgb(255, 0, 135, 255),
+                        Color.FromArgb(255, 220, 0, 255))
+                },
+                {
+                    MeditationState.LEVEL_1,
+                    new Tuple<Color, Color, Color>(
+                        Color.FromArgb(255, 255, 0, 0),
+                        Color.FromArgb(255, 150, 0, 255),
+                        Color.FromArgb(255,  0, 192, 255))
+                },
+                {
+                    MeditationState.LEVEL_5,
+                    new Tuple<Color, Color, Color>(
+                        Color.FromArgb(255, 204, 0, 255),
+                        Color.FromArgb(255, 0, 255, 24),
+                        Color.FromArgb(255, 0, 24, 255))
+                }
+            };
+
+
     }
 }

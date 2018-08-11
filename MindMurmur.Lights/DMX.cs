@@ -88,9 +88,32 @@ namespace MindMurmur.Lights
         public void SetColor(Color color)
         {
             byte[] dmxdata = GetDMXFromColors(new Color[] { color, color, color, color, color, color, color });
-            Console.ForegroundColor = ConsoleColor.White;
             Console.WriteLine("[" + color.ToString() + "]: (" + dmxdata[0] + "," + dmxdata[1] + "," + dmxdata[2] + ") ");
             SendDMXFrames(dmxdata);
+        }
+
+        public void SetEdgeLightStrips(Color color)
+        {
+            foreach (LightStrip strip in Config.LightStripList)
+            {
+                var channels = strip.ChannelColors(color);
+                foreach (var key in channels.Keys)
+                {
+                    DMXController.SetChannel(key, channels[key]);
+                }
+            }
+        }
+
+        public void SetChandelierLightStrips(Color color)
+        {
+            foreach (LightStrip strip in Config.ChandelierLightStripList)
+            {
+                var channels = strip.ChannelColors(color);
+                foreach (var key in channels.Keys)
+                {
+                    DMXController.SetChannel(key, channels[key]);
+                }
+            }
         }
 
         public void SetLightStripColor(LightStrip strip, Color color)
@@ -101,6 +124,7 @@ namespace MindMurmur.Lights
                 DMXController.SetChannel(key, channels[key]);
             }
         }
+
         /// <summary>
         /// Blinks the LED lights from whatever the current color is, marking it darker and then back to the normal color 
         /// </summary>

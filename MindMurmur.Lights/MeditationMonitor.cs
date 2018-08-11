@@ -1,6 +1,8 @@
 ﻿using System.Drawing;
 using System;
+using MindMurmur.Domain;
 using MindMurmur.Domain.Messages;
+using MindMurmur.Lights.Control;
 
 namespace MindMurmur.Lights
 {
@@ -37,7 +39,7 @@ namespace MindMurmur.Lights
 
         public virtual void OnNext(MeditationState value)
         {
-            Console.WriteLine("Current color is {0}", value);
+            Console.WriteLine("Current state is {0}", value);
             if (first)
             {
                 last = value;
@@ -48,6 +50,7 @@ namespace MindMurmur.Lights
                 Console.WriteLine("Current color is {0}, a change from {1}", value, last);
                 last = value;
             }
+   
         }
     }
 }
