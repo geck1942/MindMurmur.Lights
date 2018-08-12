@@ -16,4 +16,10 @@ namespace MindMurmur.Domain
         LEVEL_4 = 4,
         LEVEL_5 = 5
     }
+
+    public enum ChandelierBehavior
+    {
+        ALTERNATE_ALL_COLORS_OVER_TIMESPAN = 0,
+        SEPARATE_COLORS_ACROSS_LEVELS = 1
+    }
 }

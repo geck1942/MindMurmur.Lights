@@ -1,11 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using MindMurmur.Domain;
 using MindMurmur.Domain.Light;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace MindMurmur.Lights.Control
 {
@@ -14,31 +17,53 @@ namespace MindMurmur.Lights.Control
         /// <summary>
         /// Channels currently configured for LED lights
         /// </summary>
-        public static List<LightStrip> LightStripList = new List<LightStrip>();
-        public static List<LightStrip> ChandelierLightStripList = new List<LightStrip>();
-
-        /// <summary>
-        /// Frequency for updates
-        /// </summary>
-        public static int TimerMs = 500;
+        public static List<LightStrip> VerticesLightStrips = new List<LightStrip>();
+        public static Dictionary<short,LightStrip> ChandelierLightStrips = new Dictionary<short, LightStrip>();
         public static Int16 DimmerValue = -1; //TODO: make this a config value
+        public static Int32 ChandelierLevelSwapSeconds = 10;
+        public static ChandelierBehavior ChandelierOperationBehavior = ChandelierBehavior.ALTERNATE_ALL_COLORS_OVER_TIMESPAN;
 
         static Config() {
 
         }
 
         public static void Init() {
-            LightStripList.Add(new LightStrip(1,1, DimmerValue, false)); //this is the cheap light that already is connected
 
-            //LightStripList.Add(new LightStrip(12, 1));
-            //LightStripList.Add(new LightStrip(16, 1));
-            //LightStripList.Add(new LightStrip(20, 1));
+            List<LightStrip> lightStrips = JsonConvert.DeserializeObject<List<LightStrip>>(File.ReadAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ConfigData", "lightStripConfig.json")));
+            Dictionary<short, LightStrip> chandelierLightStrips = JsonConvert.DeserializeObject<Dictionary<short, LightStrip>>(File.ReadAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ConfigData", "chandelierLightStripConfig.json")));
+
+            foreach (LightStrip strip in lightStrips)
+            {
+                strip.LEDList.RemoveAt(0);
+            }
+            foreach (var k in chandelierLightStrips.Keys)
+            {
+                chandelierLightStrips[k].LEDList.RemoveAt(0);
+            }
+
+            VerticesLightStrips = lightStrips;
+            ChandelierLightStrips = chandelierLightStrips;
+
+            return;
+            VerticesLightStrips.Add(new LightStrip(1,1, DimmerValue, false)); //this is the cheap light that already is connected
+            VerticesLightStrips.Add(new LightStrip(4, 1, DimmerValue, false));
+            VerticesLightStrips.Add(new LightStrip(8, 1, DimmerValue, false));
+            VerticesLightStrips.Add(new LightStrip(12, 1, DimmerValue, false));
+
+            //ChandelierLightStrips.Add(new LightStrip(63, 72, DimmerValue, false)); //this is the advanced light strip with 72 independent addressable lights
 
             ////Chandelier
-            //ChandelierLightStripList.Add(new LightStrip(50, 1));
-            //ChandelierLightStripList.Add(new LightStrip(54, 1));
-            //ChandelierLightStripList.Add(new LightStrip(58, 1));
-            //ChandelierLightStripList.Add(new LightStrip(62, 72)); //this is the advanced light strip with 72 independent addressable lights
+            ChandelierLightStrips.Add(1, new LightStrip(31, 1, DimmerValue, false));
+            ChandelierLightStrips.Add(2, new LightStrip(35, 1, DimmerValue, false));
+            ChandelierLightStrips.Add(3, new LightStrip(39, 1, DimmerValue, false));
+            ChandelierLightStrips.Add(4, new LightStrip(43, 1, DimmerValue, false));
+
+            using (StreamWriter file = File.CreateText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ConfigData", "chandelierLightStripConfig.json")))
+            {
+                JsonSerializer serializer = new JsonSerializer();
+                //serialize object directly into file stream
+                serializer.Serialize(file, ChandelierLightStrips);
+            }
         }
 
         public static short MaxChannels
@@ -46,15 +71,15 @@ namespace MindMurmur.Lights.Control
             get
             {
                 short maxChannel = 0;
-                foreach (LightStrip strip in LightStripList)
+                foreach (LightStrip strip in VerticesLightStrips)
                 {
                     if (strip.MaxChannel > maxChannel)
                         maxChannel = strip.MaxChannel;
                 }
-                foreach (LightStrip strip in ChandelierLightStripList)
+                foreach (var k in ChandelierLightStrips.Keys)
                 {
-                    if (strip.MaxChannel > maxChannel)
-                        maxChannel = strip.MaxChannel;
+                    if (ChandelierLightStrips[k].MaxChannel > maxChannel)
+                        maxChannel = ChandelierLightStrips[k].MaxChannel;
                 }
                 return maxChannel;
             }
@@ -73,44 +98,44 @@ namespace MindMurmur.Lights.Control
                 {
                     MeditationState.IDLE,
                         new Tuple<Color, Color, Color>(
-                            Color.FromArgb(255, 204, 0, 255), 
+                            Color.FromArgb(255, 204, 0, 255),
                             Color.FromArgb(255, 0, 255, 24),
-                            Color.FromArgb(255, 0, 24, 255))
+                            Color.FromArgb(255, 0, 89, 255))
                 },
                 {
                     MeditationState.LEVEL_4,
                     new Tuple<Color, Color, Color>(
                         Color.FromArgb(255, 0, 192, 255),
                         Color.FromArgb(255, 255, 188, 0),
-                        Color.FromArgb(255, 0, 255, 150))
+                        Color.FromArgb(255, 22, 232, 107))
                 },
                 {
                     MeditationState.LEVEL_3,
                     new Tuple<Color, Color, Color>(
                         Color.FromArgb(255, 0, 255, 0),
                         Color.FromArgb(255, 181, 0, 255),
-                        Color.FromArgb(255,  255, 220, 0))
+                        Color.FromArgb(255, 232, 204,2))
                 },
                 {
                     MeditationState.LEVEL_2,
                     new Tuple<Color, Color, Color>(
                         Color.FromArgb(255, 255, 210, 0),
                         Color.FromArgb(255, 0, 135, 255),
-                        Color.FromArgb(255, 220, 0, 255))
+                        Color.FromArgb(255, 255, 52, 211))
                 },
                 {
                     MeditationState.LEVEL_1,
                     new Tuple<Color, Color, Color>(
                         Color.FromArgb(255, 255, 0, 0),
                         Color.FromArgb(255, 150, 0, 255),
-                        Color.FromArgb(255,  0, 192, 255))
+                        Color.FromArgb(255, 78, 184, 255))
                 },
                 {
                     MeditationState.LEVEL_5,
                     new Tuple<Color, Color, Color>(
                         Color.FromArgb(255, 204, 0, 255),
                         Color.FromArgb(255, 0, 255, 24),
-                        Color.FromArgb(255, 0, 24, 255))
+                        Color.FromArgb(255, 0, 89, 255))
                 }
             };
 

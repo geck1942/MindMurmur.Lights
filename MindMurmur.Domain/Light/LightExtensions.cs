@@ -21,5 +21,15 @@ namespace MindMurmur.Domain.Light
         {
             return Convert.ToByte((color - (255 - alpha)) < 0 ? 0 : color - (255 - alpha));
         }
+        /// <summary>
+        /// returns the faded color based using sin wave
+        /// </summary>
+        /// <param name="color"></param>
+        /// <param name="pulsetime"></param>
+        /// <returns></returns>
+        public static Color FadedColor(this Color color, float pulsetime)
+        {
+            return Color.FromArgb((int)(255 * (1 - Math.Sin(pulsetime * Math.PI))), color.R, color.G, color.B);
+        }
     }
 }

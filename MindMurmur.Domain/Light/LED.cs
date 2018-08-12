@@ -1,15 +1,22 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Runtime.Serialization;
 
 namespace MindMurmur.Domain.Light
 {
+    [DataContract]
     public class LED
     {
+        [DataMember]
         public short Index { get; set; }
+        [DataMember]
         public short AlphaChannel { get; set; }
+        [DataMember]
         public short RedChannel { get; set; }
+        [DataMember]
         public short GreenChannel { get; set; }
+        [DataMember]
         public short BlueChannel { get; set; }
 
         public byte Alpha { get; set; }

@@ -1,8 +1,12 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.IO;
 using System.Reactive.Linq;
 using EasyNetQ;
 using MindMurmur.Domain.Messages;
 using MindMurmur.Lights.Control;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace MindMurmur.Lights
 {
@@ -13,9 +17,9 @@ namespace MindMurmur.Lights
             var keepRunning = true;
             //initialize config
             Config.Init();
-            StartTimerForTestEvents();
-            //StartLightManagerTest();
-            StartLightManager();
+            StartLightManagerTest();
+            //StartTimerForTestEvents();
+            //StartLightManager();
             Console.WriteLine("Listening for messages. Hit < return > to quit.");
         }
 
