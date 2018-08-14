@@ -331,13 +331,11 @@ namespace MindMurmur.Lights
             //int alpha = (int)(255 * (1 - Math.Sin(pulsetime * Math.PI)));
             //Color fadedColor = Color.FromArgb(alpha, color.R, color.G, color.B);
 
-            //byte[] dmx = this.LightDMX.GetDMXFromColors(new List<Color> { fadedColor });
-            //LightDMX.SendDMXFrames(dmx);
             LightDMX.SetEdgeLightStrips(fadedColor);
 
             LightDMX.SetChandelierLightStrips(GetChandelierColors( new List<Color>(){ fadedColor, fadedSecondaryColor, fadedTertiaryColor }));
 
-            Console.WriteLine($"LED COLOR: {fadedColor.ToString()}");
+            Console.ForegroundColor = ConsoleColor.Yellow; Console.WriteLine("[ ] LED COLOR: " + fadedColor.ToString());
         }
 
         public void StartChandelierCycle(int amountOfTimeSeconds, int frequencySeconds)
@@ -377,6 +375,7 @@ namespace MindMurmur.Lights
             if (CurrentHeartRate < 20) CurrentHeartRate = 20;
 
             //sets up bus connection and subscribes
+            Console.ForegroundColor = ConsoleColor.White; Console.WriteLine("[ ] Subscribing to the bus...");
             HitchToTheBus();
 
             // set pulse timer @ 25 FPS to update LEDs
@@ -388,67 +387,75 @@ namespace MindMurmur.Lights
         /// </summary>
         public void HitchToTheBus()
         {
-            var bus = RabbitHutch.CreateBus("host=localhost");
-
-            bus.Subscribe<HeartRateCommand>("heartRateCommand", (cmd) =>
+            var bus = RabbitHutch.CreateBus("host=localhost;port=5672;username=guest;password=guest");
+            try
             {
-                if (CurrentHeartRate != cmd.HeartRate)
+                bus.Subscribe<HeartRateCommand>("heartRateCommand", (cmd) =>
                 {
-                    Console.WriteLine($"Heart.Rx {cmd.CommandId} [{cmd.HeartRate}]");
-                    CurrentHeartRate = cmd.HeartRate/2;//cutting the heart rate in half
-                    bpmSubject.OnNext(cmd.HeartRate);
-                }
-            });
+                    if (CurrentHeartRate != cmd.HeartRate)
+                    {
+                        Console.WriteLine($"Heart.Rx {cmd.CommandId} [{cmd.HeartRate}]");
+                        CurrentHeartRate = cmd.HeartRate / 2;//cutting the heart rate in half
+                        bpmSubject.OnNext(cmd.HeartRate);
+                    }
+                });
 
-            bus.Subscribe<DimmerControlCommand>("dimmerControlCommand", (cmd) =>
+                bus.Subscribe<DimmerControlCommand>("dimmerControlCommand", (cmd) =>
+                {
+                    if (Config.DimmerValue != cmd.DimmerValue)
+                    {
+                        Console.WriteLine($"Dimmer.Rx {cmd.CommandId} [{cmd.DimmerValue}]");
+                        Config.DimmerValue = cmd.DimmerValue;
+                        foreach (LightStrip strip in Config.VerticesLightStrips)
+                        {
+                            strip.Dimmer = Config.DimmerValue;
+                        }
+                        foreach (var k in Config.ChandelierLightStrips.Keys)
+                        {
+                            Config.ChandelierLightStrips[k].Dimmer = Config.DimmerValue;
+                        }
+                        dimmerSubject.OnNext(cmd.DimmerValue);
+                    }
+                });
+
+                bus.Subscribe<ColorControlCommand>("colorCommand", (cmd) =>
+                {
+                    Color cmdColor = Color.FromArgb(cmd.ColorRed, cmd.ColorGreen, cmd.ColorBlue);
+                    if (CurrentColor != cmdColor)
+                    {
+                        Console.WriteLine($"Color.Rx {cmd.CommandId} [{cmd.ColorRed},{cmd.ColorGreen},{cmd.ColorBlue}]");
+                        CurrentColor = cmdColor;
+                        colorSubject.OnNext(cmdColor);
+                    }
+                });
+
+                bus.Subscribe<MeditationStateCommand>("meditationStateCommand", (cmd) =>
+                {
+                    Console.WriteLine($"MeditationState.Rx {cmd.CommandId} [{cmd.State}]");
+                    var thisState = (MeditationState)cmd.State;
+                    lastStateChange = DateTime.UtcNow;
+                    //Set previous values
+                    PreviousMediationState = thisState;
+                    PreviousColor = CurrentColor;
+                    PreviousSecondaryColor = CurrentSecondaryColor;
+                    PreviousTertiaryColor = CurrentTertiaryColor;
+                    //set new colors
+                    CurrentColor = Config.MeditationColors[thisState].Item1; //sets the primary color from the meditation state
+                    CurrentSecondaryColor = Config.MeditationColors[thisState].Item2; //sets the secondary color from the meditation state
+                    CurrentTertiaryColor = Config.MeditationColors[thisState].Item3; //sets the tertiary color from the meditation state
+                    CurrentMediationState = thisState;//record the current state
+
+                    meditationSubject.OnNext(thisState);
+                    // meditationSubject.Subscribe(state => { });
+                    StartChandelierCycle(15, 3);
+
+                    BuildGradientTransition();//build the bitmap so we can get the color for transitioning
+                });
+            }
+            catch (Exception ex)
             {
-                if (CurrentHeartRate != cmd.DimmerValue)
-                {
-                    Console.WriteLine($"Dimmer.Rx {cmd.CommandId} [{cmd.DimmerValue}]");
-                    Config.DimmerValue = cmd.DimmerValue;
-                    foreach (LightStrip strip in Config.VerticesLightStrips)
-                    {
-                        strip.Dimmer = Config.DimmerValue;
-                    }
-                    foreach (var k in Config.ChandelierLightStrips.Keys)
-                    {
-                        Config.ChandelierLightStrips[k].Dimmer = Config.DimmerValue;
-                    }
-                    dimmerSubject.OnNext(cmd.DimmerValue);
-                }
-            });
-
-            bus.Subscribe<ColorControlCommand>("colorCommand", (cmd) => {
-                Color cmdColor = Color.FromArgb(cmd.ColorRed, cmd.ColorGreen, cmd.ColorBlue);
-                if (CurrentColor != cmdColor)
-                {
-                    Console.WriteLine($"Color.Rx {cmd.CommandId} [{cmd.ColorRed},{cmd.ColorGreen},{cmd.ColorBlue}]");
-                    CurrentColor = cmdColor;
-                    colorSubject.OnNext(cmdColor);
-                }
-            });
-
-            bus.Subscribe<MeditationStateCommand>("meditationStateCommand", (cmd) => {
-                Console.WriteLine($"MeditationState.Rx {cmd.CommandId} [{cmd.State}]");
-                var thisState = (MeditationState)cmd.State;
-                lastStateChange = DateTime.UtcNow;
-                //Set previous values
-                PreviousMediationState = thisState;
-                PreviousColor = CurrentColor;
-                PreviousSecondaryColor = CurrentSecondaryColor;
-                PreviousTertiaryColor = CurrentTertiaryColor;
-                //set new colors
-                CurrentColor = Config.MeditationColors[thisState].Item1; //sets the primary color from the meditation state
-                CurrentSecondaryColor = Config.MeditationColors[thisState].Item2; //sets the secondary color from the meditation state
-                CurrentTertiaryColor = Config.MeditationColors[thisState].Item3; //sets the tertiary color from the meditation state
-                CurrentMediationState = thisState;//record the current state
-
-                meditationSubject.OnNext(thisState);
-               // meditationSubject.Subscribe(state => { });
-                StartChandelierCycle(15, 3);
-
-                BuildGradientTransition();//build the bitmap so we can get the color for transitioning
-            });
+                throw ex;
+            }
         }
 
         public async Task RunTestsTask()
