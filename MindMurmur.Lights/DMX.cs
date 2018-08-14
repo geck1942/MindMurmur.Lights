@@ -23,7 +23,7 @@ namespace MindMurmur.Lights
         {
         }
 
-        async public Task Connect()
+        public void Connect()
         {
             Console.ForegroundColor = ConsoleColor.White; Console.WriteLine("[ ] Connecting to DMX Device...");
             ushort vendorId = 0x10CF;
@@ -40,9 +40,9 @@ namespace MindMurmur.Lights
                 DMXController = new DMXController();
                 DMXController.StartDevice();
                 DMXController.SetChannelCount(256);
-                await Task.Delay(2000);
+                Thread.Sleep(2000);
                 DMXController.SetChannelCount(256);
-                await Task.Delay(2000);
+                Thread.Sleep(2000);
                 Console.ForegroundColor = ConsoleColor.White; Console.WriteLine("[<] DMX: SetChannelCount: " + maxChannel);
                 IsConnected = true;
                 Console.ForegroundColor = ConsoleColor.Green; Console.WriteLine("[-] Connected");
@@ -186,7 +186,7 @@ namespace MindMurmur.Lights
 
         #endregion
 
-        private async Task StartQueueListening()
+        private void StartQueueListening()
         {
             //Task.Run(async () =>
             // {

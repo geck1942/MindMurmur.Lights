@@ -34,6 +34,8 @@ namespace MindMurmur.Lights
         private Bitmap fromTransitionBitmapTertiaryColor = new Bitmap(51, 2);
         private Bitmap toTransitionBitmapTertiaryColor = new Bitmap(51, 2);
         private Bitmap meditativeStateBitmapColor = new Bitmap(101, 2);
+
+        private bool hitched_to_bus = false;
         private int currentHeartRate = 20;
         private short startingChandelierIndex = 1;
         private short chandelierColorIndex = 1;
@@ -50,8 +52,8 @@ namespace MindMurmur.Lights
 
         #region Public Properties
 
-        public MeditationState PreviousMediationState { get; set; }
-        public MeditationState CurrentMediationState { get; set; }
+        public volatile MeditationState PreviousMediationState;
+        public volatile MeditationState CurrentMediationState;
         private int CurrentHeartRate
         {
             get { return (secondsFromLastTransition > 15.0) ? currentHeartRate / 2 : currentHeartRate; }
@@ -365,7 +367,7 @@ namespace MindMurmur.Lights
             try
             {
                 if (LightDMX != null)
-                    await LightDMX.Connect();
+                    LightDMX.Connect();
             }
             catch (Exception ex)
             {
@@ -387,25 +389,31 @@ namespace MindMurmur.Lights
         /// </summary>
         public void HitchToTheBus()
         {
-            var bus = RabbitHutch.CreateBus("host=localhost;port=5672;username=guest;password=guest");
+            if (hitched_to_bus)
+                return;
+            var bus = RabbitHutch.CreateBus("host=localhost;port=5672;username=guest;password=guest").Advanced;
+
             try
             {
-                bus.Subscribe<HeartRateCommand>("heartRateCommand", (cmd) =>
+
+                var heartrate_queue = bus.QueueDeclare("MindMurmur.Domain.Messages.HeartRateCommand, MindMurmur.Domain", durable: false);
+                bus.Consume<HeartRateCommand>(heartrate_queue, (cmd, msg) =>
                 {
-                    if (CurrentHeartRate != cmd.HeartRate)
+                    if (CurrentHeartRate != cmd.Body.HeartRate)
                     {
-                        Console.WriteLine($"Heart.Rx {cmd.CommandId} [{cmd.HeartRate}]");
-                        CurrentHeartRate = cmd.HeartRate / 2;//cutting the heart rate in half
-                        bpmSubject.OnNext(cmd.HeartRate);
+                        Console.WriteLine($"Heart.Rx {cmd.Body.CommandId} [{cmd.Body.HeartRate}]");
+                        CurrentHeartRate = cmd.Body.HeartRate / 2;//cutting the heart rate in half
+                        bpmSubject.OnNext(cmd.Body.HeartRate);
                     }
                 });
 
-                bus.Subscribe<DimmerControlCommand>("dimmerControlCommand", (cmd) =>
+                var dimmer_queue = bus.QueueDeclare("MindMurmur.Domain.Messages.DimmerControlCommand, MindMurmur.Domain", durable: false);
+                bus.Consume<DimmerControlCommand>(dimmer_queue, (cmd, msg) =>
                 {
-                    if (Config.DimmerValue != cmd.DimmerValue)
+                    if (Config.DimmerValue != cmd.Body.DimmerValue)
                     {
-                        Console.WriteLine($"Dimmer.Rx {cmd.CommandId} [{cmd.DimmerValue}]");
-                        Config.DimmerValue = cmd.DimmerValue;
+                        Console.WriteLine($"Dimmer.Rx {cmd.Body.CommandId} [{cmd.Body.DimmerValue}]");
+                        Config.DimmerValue = cmd.Body.DimmerValue;
                         foreach (LightStrip strip in Config.VerticesLightStrips)
                         {
                             strip.Dimmer = Config.DimmerValue;
@@ -414,25 +422,30 @@ namespace MindMurmur.Lights
                         {
                             Config.ChandelierLightStrips[k].Dimmer = Config.DimmerValue;
                         }
-                        dimmerSubject.OnNext(cmd.DimmerValue);
+                        dimmerSubject.OnNext(cmd.Body.DimmerValue);
                     }
                 });
 
-                bus.Subscribe<ColorControlCommand>("colorCommand", (cmd) =>
+                var color_queue = bus.QueueDeclare("MindMurmur.Domain.Messages.ColorControlCommand, MindMurmur.Domain", durable: false);
+                bus.Consume<ColorControlCommand>(color_queue, (cmd, msg) =>
                 {
-                    Color cmdColor = Color.FromArgb(cmd.ColorRed, cmd.ColorGreen, cmd.ColorBlue);
+                    Color cmdColor = Color.FromArgb(cmd.Body.ColorRed, cmd.Body.ColorGreen, cmd.Body.ColorBlue);
                     if (CurrentColor != cmdColor)
                     {
-                        Console.WriteLine($"Color.Rx {cmd.CommandId} [{cmd.ColorRed},{cmd.ColorGreen},{cmd.ColorBlue}]");
+                        Console.WriteLine($"Color.Rx {cmd.Body.CommandId} [{cmd.Body.ColorRed},{cmd.Body.ColorGreen},{cmd.Body.ColorBlue}]");
                         CurrentColor = cmdColor;
                         colorSubject.OnNext(cmdColor);
                     }
                 });
 
-                bus.Subscribe<MeditationStateCommand>("meditationStateCommand", (cmd) =>
+                var meditation_state_queue = bus.QueueDeclare("MindMurmur.Domain.Messages.MeditationStateCommand, MindMurmur.Domain", durable: false);
+                bus.Consume<MeditationStateCommand>(meditation_state_queue, (cmd, msg) =>
                 {
-                    Console.WriteLine($"MeditationState.Rx {cmd.CommandId} [{cmd.State}]");
-                    var thisState = (MeditationState)cmd.State;
+                    if ((int)PreviousMediationState == cmd.Body.State)
+                        return;
+
+                    Console.WriteLine($"MeditationState.Rx {cmd.Body.CommandId} [{cmd.Body.State}]");
+                    var thisState = (MeditationState)cmd.Body.State;
                     lastStateChange = DateTime.UtcNow;
                     //Set previous values
                     PreviousMediationState = thisState;
@@ -451,9 +464,13 @@ namespace MindMurmur.Lights
 
                     BuildGradientTransition();//build the bitmap so we can get the color for transitioning
                 });
+
+                hitched_to_bus = true;
+
             }
             catch (Exception ex)
             {
+                hitched_to_bus = false;
                 throw ex;
             }
         }
@@ -461,7 +478,7 @@ namespace MindMurmur.Lights
         public async Task RunTestsTask()
         {
             if (LightDMX != null)
-                await LightDMX.Connect();
+                LightDMX.Connect();
 
             await LightDMX.TestSequence().ConfigureAwait(true);
             await LightDMX.Test().ConfigureAwait(true);
