@@ -1,8 +1,12 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.IO;
 using System.Reactive.Linq;
 using EasyNetQ;
 using MindMurmur.Domain.Messages;
 using MindMurmur.Lights.Control;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace MindMurmur.Lights
 {
@@ -13,8 +17,8 @@ namespace MindMurmur.Lights
             var keepRunning = true;
             //initialize config
             Config.Init();
-            //StartTimerForTestEvents();
             StartLightManagerTest();
+            //StartTimerForTestEvents();
             //StartLightManager();
             Console.WriteLine("Listening for messages. Hit < return > to quit.");
         }
@@ -58,7 +62,22 @@ namespace MindMurmur.Lights
             IBus bus = RabbitHutch.CreateBus("host=localhost");
 
             Observable
-                .Timer(TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(15))
+                .Timer(TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(10))
+                .Subscribe(
+                    x =>
+                    {
+                        var random = new Random();
+                        var heartCmd = new HeartRateCommand()
+                        {
+                            CommandId = Guid.NewGuid().ToString(),
+                            HeartRate = Convert.ToInt16(random.Next(60, 65))
+                        };
+                        bus.Publish(heartCmd);
+                        Console.WriteLine("Published test HeartRateCommand.");
+                    });
+
+            Observable
+                .Timer(TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(50))
                 .Subscribe(
                     x =>
                     {
@@ -66,22 +85,11 @@ namespace MindMurmur.Lights
                         var mediationStateCmd = new MeditationStateCommand()
                         {
                             CommandId = Guid.NewGuid().ToString(),
-                            State = Convert.ToInt16(random.Next(-1, 5))
+                            State = Convert.ToInt16(random.Next(0, 5))
                         };
-                        var heartCmd = new HeartRateCommand()
-                        {
-                            CommandId = Guid.NewGuid().ToString(),
-                            HeartRate = Convert.ToInt16(random.Next(60, 170))
-                        };
-
                         bus.Publish(mediationStateCmd);
-                        Console.BackgroundColor = ConsoleColor.DarkRed;
                         Console.WriteLine("Published test MeditationStateCommand.");
-
-                        bus.Publish(heartCmd);
-                        Console.WriteLine("Published test HeartRateCommand.");
-                        Console.BackgroundColor = ConsoleColor.Black;
-                        Console.ForegroundColor = ConsoleColor.White;
+                        
                     });
             Console.WriteLine("StartTimerForTestEvents()....");
         }

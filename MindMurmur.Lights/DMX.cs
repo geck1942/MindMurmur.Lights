@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -16,6 +17,7 @@ namespace MindMurmur.Lights
         private short maxChannel = 512;
 
         public bool IsConnected = false;
+       // public ConcurrentQueue<DmxData> DataQueue = new ConcurrentQueue<DmxData>();
 
         public DMX(short channelCount)
         {
@@ -44,6 +46,9 @@ namespace MindMurmur.Lights
                 Console.ForegroundColor = ConsoleColor.White; Console.WriteLine("[<] DMX: SetChannelCount: " + maxChannel);
                 IsConnected = true;
                 Console.ForegroundColor = ConsoleColor.Green; Console.WriteLine("[-] Connected");
+
+                //start listening for queued messages
+                StartQueueListening();
             }
             catch (Exception ex)
             {
@@ -53,70 +58,79 @@ namespace MindMurmur.Lights
             }
         }
 
-        public byte[] GetDMXFromColors(IEnumerable<Color> LEDColors)
-        {
-            if (LEDColors == null || !LEDColors.Any()) return null;
-            if (LEDColors.Count() > maxChannel / 3)
-                LEDColors = LEDColors.Take(maxChannel / 3);
+        //public byte[] GetDMXFromColors(IEnumerable<Color> LEDColors)
+        //{
+        //    if (LEDColors == null || !LEDColors.Any()) return null;
+        //    if (LEDColors.Count() > maxChannel / 3)
+        //        LEDColors = LEDColors.Take(maxChannel / 3);
 
-            byte[] channels = LEDColors.SelectMany((color) =>
+        //    byte[] channels = LEDColors.SelectMany((color) =>
+        //    {
+        //        var A = color.A / 255M;
+        //        var RGB = new ColorMine.ColorSpaces.Rgb() { R = (int)(color.R * A), G = (int)(color.G * A), B = (int)(color.B * A) };
+        //        var CMY = RGB.To<ColorMine.ColorSpaces.Cmy>();
+        //        // LAB
+        //        return new byte[] {
+        //            (byte)(15*CMY.C),
+        //            (byte)(15*CMY.M),
+        //            (byte)(15*CMY.Y)
+        //        };
+        //    }).ToArray();
+
+        //    return channels;
+        //}
+
+        //public void SendDMXFrames(byte[] channelsdata)
+        //{
+        //    Debug.WriteLine($"{"SendDMXFrames"}: {BitConverter.ToString(channelsdata)}");
+
+        //    //// V3 k8062
+        //    for (int i = 0; i < 2; i++)
+        //        for (int channel = 0; channel < channelsdata.Length; channel++)
+        //            DMXController.SetChannel((short)(channel + 8 + (channelsdata.Length * i)), channelsdata[channel]);
+        //}
+
+        //public void SetColor(Color color)
+        //{
+        //    byte[] dmxdata = GetDMXFromColors(new Color[] { color, color, color, color, color, color, color });
+        //    Console.WriteLine("[" + color.ToString() + "]: (" + dmxdata[0] + "," + dmxdata[1] + "," + dmxdata[2] + ") ");
+        //    SendDMXFrames(dmxdata);
+        //}
+
+        public async Task SetEdgeLightStrips(Color color)
+        {
+            foreach (LightStrip strip in Config.VerticesLightStrips)
             {
-                var A = color.A / 255M;
-                var RGB = new ColorMine.ColorSpaces.Rgb() { R = (int)(color.R * A), G = (int)(color.G * A), B = (int)(color.B * A) };
-                var CMY = RGB.To<ColorMine.ColorSpaces.Cmy>();
-                // LAB
-                return new byte[] {
-                    (byte)(15*CMY.C),
-                    (byte)(15*CMY.M),
-                    (byte)(15*CMY.Y)
-                };
-            }).ToArray();
-
-            return channels;
+                var channels = strip.ChannelColors(color);
+                foreach (var key in channels.Keys)
+                {
+                    //DataQueue.Enqueue(new DmxData(key, channels[key]));
+                    DMXController.SetChannel(key, channels[key]);
+                }
+            }
         }
 
-        public void SendDMXFrames(byte[] channelsdata)
+        public async Task SetChandelierLightStrips(Dictionary<short,Color> colors)
         {
-            Debug.WriteLine($"{"SendDMXFrames"}: {BitConverter.ToString(channelsdata)}");
-
-            //// V3 k8062
-            for (int i = 0; i < 2; i++)
-                for (int channel = 0; channel < channelsdata.Length; channel++)
-                    DMXController.SetChannel((short)(channel + 8 + (channelsdata.Length * i)), channelsdata[channel]);
+            foreach (var k in colors.Keys)
+            {
+                var channels = Config.ChandelierLightStrips[k].ChannelColors(colors[k]);
+                foreach (var key in channels.Keys)
+                {
+                    //DataQueue.Enqueue(new DmxData(key, channels[key]));
+                    DMXController.SetChannel(key, channels[key]);
+                }
+            }
         }
 
-        public void SetColor(Color color)
-        {
-            byte[] dmxdata = GetDMXFromColors(new Color[] { color, color, color, color, color, color, color });
-            Console.ForegroundColor = ConsoleColor.White;
-            Console.WriteLine("[" + color.ToString() + "]: (" + dmxdata[0] + "," + dmxdata[1] + "," + dmxdata[2] + ") ");
-            SendDMXFrames(dmxdata);
-        }
-
-        public void SetLightStripColor(LightStrip strip, Color color)
+        public async Task SetLightStripColor(LightStrip strip, Color color)
         {
             var channels = strip.ChannelColors(color);
             foreach (var key in channels.Keys)
             {
+                //DataQueue.Enqueue(new DmxData(key, channels[key]));
                 DMXController.SetChannel(key, channels[key]);
             }
-        }
-        /// <summary>
-        /// Blinks the LED lights from whatever the current color is, marking it darker and then back to the normal color 
-        /// </summary>
-        /// <param name="currentColor"></param>
-        public void HeartRateBlink(Color currentColor)
-        {
-            byte[] dmxdataDark = GetDMXFromColors(new Color[]
-                {Color.FromArgb(0, 10, 10, 10)});
-            byte[] dmxdata = GetDMXFromColors(new Color[] { currentColor, currentColor, currentColor, currentColor, currentColor, currentColor, currentColor });
-            Console.ForegroundColor = ConsoleColor.DarkBlue;
-            Console.WriteLine("[ BLINK ]     " + currentColor.ToString() + ": (" + dmxdataDark[0] + "," + dmxdataDark[1] + "," + dmxdataDark[2] + ") ");
-            Thread.Sleep(100);
-            SendDMXFrames(dmxdataDark);
-            Console.ForegroundColor = ConsoleColor.White;
-            Console.WriteLine("[ BLINKBACK ] " + currentColor.ToString() + ": (" + dmxdata[0] + "," + dmxdata[1] + "," + dmxdata[2] + ") ");
-            SendDMXFrames(dmxdata);
         }
 
         public void Dispose()
@@ -131,13 +145,20 @@ namespace MindMurmur.Lights
         public async Task TestSequence()
         {
             Console.ForegroundColor = ConsoleColor.White; Console.WriteLine("[ ] Testing lights...");
+
             foreach (var color in new Color[] { Color.Red, Color.Green, Color.Blue, Color.Yellow, Color.Orange, Color.Cyan, Color.Pink, Color.Purple, Color.White, Color.LightGray, Color.Gray, Color.DarkGray, Color.Black })
             {
-                foreach (LightStrip strip in Config.LightStripList)
+                foreach (LightStrip strip in Config.VerticesLightStrips)
                 {
-                    SetLightStripColor(strip,color);
+                    await SetLightStripColor(strip, color);
+                    await Task.Delay(500);
                 }
-               // SetColor(color);
+                //await Task.Delay(400);
+                //foreach (var k in Config.ChandelierLightStrips.Keys)
+                //{
+                //    await SetLightStripColor(Config.ChandelierLightStrips[k], color);
+                //}
+                // SetColor(color);
                 await Task.Delay(400);
             }
             Console.ForegroundColor = ConsoleColor.Green; Console.WriteLine("[-] Done testing");
@@ -153,39 +174,45 @@ namespace MindMurmur.Lights
 
             while (true)
             {
-                //for (short i = 1; i < 512; i++)
-                //{
-                //    DMXController.SetChannel(i, max);
-                //    Debug.WriteLine($"({i}:{max})");
-                //    Thread.Sleep(100);
-                //}
-
-                for (short i = 8; i < 20; i++)
+                for (short i = 20; i < 24; i++)
                 {
+                    Debug.WriteLine($"({i}:{max},{high},{med},{low},{verylow})");
                     DMXController.SetChannel(i, max);
-                    Debug.WriteLine($"({i}:{max})");
-                    Thread.Sleep(300);
+                    Thread.Sleep(200);
                     DMXController.SetChannel(i, high);
-                    Debug.WriteLine($"({i}:{high})");
-                    Thread.Sleep(300);
+                    Thread.Sleep(200);
                     DMXController.SetChannel(i, med);
-                    Debug.WriteLine($"({i}:{med})");
-                    Thread.Sleep(300);
+                    Thread.Sleep(200);
                     DMXController.SetChannel(i, low);
-                    Debug.WriteLine($"({i}:{low})");
-                    Thread.Sleep(300);
+                    Thread.Sleep(200);
                     DMXController.SetChannel(i, verylow);
-                    Debug.WriteLine($"({i}:{verylow})");
-                    Thread.Sleep(300);
-                    DMXController.SetChannel(i, max);
-                    Thread.Sleep(800);
-                    DMXController.SetChannel(i, verylow);
-                    Thread.Sleep(800);
+                    Thread.Sleep(2000);
                 }
             }
         }
 
-        #endregion 
+        #endregion
+
+        private async Task StartQueueListening()
+        {
+            //Task.Run(async () =>
+            // {
+            //     while (true)
+            //     {
+            //         DmxData data;
+            //         if (DataQueue.TryDequeue(out data))
+            //         {
+            //             Debug.WriteLine(data);
+            //             DMXController.SetChannel(data.Channel, data.Value);
+            //         }
+            //         else
+            //         {
+            //            // don't run again for at least 200 milliseconds
+            //            await Task.Delay(200);
+            //         }
+            //     }
+            // });
+        }
     }
 }
 

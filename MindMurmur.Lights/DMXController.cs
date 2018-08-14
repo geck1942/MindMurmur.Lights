@@ -1,6 +1,11 @@
 ﻿using System;
 using System.Diagnostics;
 using System.IO.MemoryMappedFiles;
+using System.Reactive.Concurrency;
+using System.Reactive.Linq;
+using System.Reactive.Subjects;
+using System.Threading;
+using MindMurmur.Domain.Light;
 
 namespace MindMurmur.Lights
 {
@@ -115,6 +120,7 @@ namespace MindMurmur.Lights
             address *= sizeof(int);
             return accessor.ReadInt32(address);
         }
+
         #endregion
 
     }

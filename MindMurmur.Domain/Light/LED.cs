@@ -1,14 +1,22 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Drawing;
+using System.Runtime.Serialization;
 
 namespace MindMurmur.Domain.Light
 {
+    [DataContract]
     public class LED
     {
+        [DataMember]
         public short Index { get; set; }
+        [DataMember]
         public short AlphaChannel { get; set; }
+        [DataMember]
         public short RedChannel { get; set; }
+        [DataMember]
         public short GreenChannel { get; set; }
+        [DataMember]
         public short BlueChannel { get; set; }
 
         public byte Alpha { get; set; }
@@ -35,9 +43,9 @@ namespace MindMurmur.Domain.Light
             return rtn;
         }
 
-        public void SetColor(Color color)
+        public void SetColor(Color color, Int16 dimmer)
         {
-            Alpha = color.A;
+            Alpha = Convert.ToByte((color.A + dimmer) > 0 && (color.A + dimmer) <= 256 ? color.A + dimmer : color.A); //applies dimmer to alpha
             Red = color.R;
             Green = color.G;
             Blue = color.B;
