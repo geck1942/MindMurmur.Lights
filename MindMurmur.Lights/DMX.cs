@@ -80,16 +80,6 @@ namespace MindMurmur.Lights
             return channels;
         }
 
-        public void SendDMXFrames(byte[] channelsdata)
-        {
-            Debug.WriteLine($"{"SendDMXFrames"}: {BitConverter.ToString(channelsdata)}");
-
-            //// V3 k8062
-            for (int i = 0; i < 2; i++)
-                for (int channel = 0; channel < channelsdata.Length; channel++)
-                    DMXController.SetChannel((short)(channel + 1 + (channelsdata.Length * i)), channelsdata[channel]);
-        }
-
         //public void SetColor(Color color)
         //{
         //    byte[] dmxdata = GetDMXFromColors(new Color[] { color, color, color, color, color, color, color });
